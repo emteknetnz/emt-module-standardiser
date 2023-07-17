@@ -41,16 +41,21 @@ function writeTemplateFileIfNotExists($filename, $content)
 
 function getSupportedModules($cmsMajor)
 {
-    $url = "https://raw.githubusercontent.com/silverstripe/supported-modules/$cmsMajor/modules.json";
-    $json = json_decode(file_get_contents($url), true);
-    $supportedModules = [];
+    $filename = "_data/$cmsMajor/modules.json";
+    if (!file_exists($filename)) {
+        $url = "https://raw.githubusercontent.com/silverstripe/supported-modules/$cmsMajor/modules.json";
+        $contents = file_get_contents($url);
+        file_put_contents($filename, $contents);
+    }
+    $json = json_decode(file_get_contents($filename), true);
+    $modules = [];
     foreach ($json as $module) {
-        $supportedModules[] = [
+        $modules[] = [
             'cloneUrl' => 'git@github.com:' . $module['github'] . '.git',
             'branch' => max($module['branches'])
         ];
     }
-    return $supportedModules;
+    return $modules;
 }
 
 function prepareContent($content)

@@ -10,5 +10,5 @@ This is a tool to standardise some files in Silverstripe modules. It's a essenti
 git clone silverstripe/module-standardiser
 cd module-standardiser
 composer install
-php run.php
+php run.php update
 ```

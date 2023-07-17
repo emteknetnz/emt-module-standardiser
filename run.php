@@ -22,6 +22,8 @@ $app->register('update')
         last-major-next-patch
     EOT))
     ->addOption('reclone', 'r', InputOption::VALUE_NONE, 'Delete and reclone modules in _modules dir')
+    ->addOption('dry-run', 'd', InputOption::VALUE_NONE, 'Dry-run - do not create pull-requests')
+    ->addOption('module', 'm', InputOption::VALUE_REQUIRED, 'Only update the specified module e.g. silverstripe-config')
     ->setCode(function (InputInterface $input, OutputInterface $output): int {
         global $MODULE_DIR;
         global $OUT;
