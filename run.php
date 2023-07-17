@@ -2,14 +2,29 @@
 
 include 'funcs.php';
 
-// loop dirs
-$TARGET_DIR = '_modules/silverstripe-config';
+// global variable
+$MODULE_DIR = '';
 
-// loop everything in cms-any
-// include php file
+function run()
+{
+    global $MODULE_DIR;
 
-// works out default branch // default major // diff - see gha-merge-up
+    $scriptFiles = array_merge(
+        getScriptFiles('any'),
+        // @todo detect cms major to use based on command line args
+        // works out default branch // default major // diff - see gha-merge-up
+        getScriptFiles('5'),
+    );
 
-// loop everything in cms<version>
-// include php file
-
+    // @todo - get modules from  funcs.php::getSupportedModules($cmsMajor)
+    $modules = [
+        'silverstripe-config'
+    ];
+    foreach ($modules as $module) {
+        $MODULE_DIR = "_modules/$module";
+        foreach ($scriptFiles as $scriptFile) {
+            include $scriptFile;
+        }
+    }
+}
+run();
