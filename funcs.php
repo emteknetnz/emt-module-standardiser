@@ -1,5 +1,9 @@
 <?php
 
+use Symfony\Component\Console\Output\NullOutput;
+use Symfony\Component\Console\Input\ArgvInput;
+use Symfony\Component\Console\Style\SymfonyStyle;
+
 function getScriptFiles($cmsMajor)
 {
     if (!ctype_digit($cmsMajor)) {
@@ -62,13 +66,24 @@ function writeFile($filename, $contents)
 
 function info($message)
 {
-    // TODO: use symfony console instead
-    echo "$message\n";
+    // using writeln with <info> instead of ->info() so that it only takes up one line instead of five
+    getIo()->writeln("<info>$message</>");
+}
+
+function warning($message)
+{
+    getIo()->warning($message);
 }
 
 function error($message)
 {
     // Don't throw hard exception here, instead let the rest of this script run
-    // TODO: use symfony console instead
-    echo "[!] $message\n";
+    getIo()->error($message);
+}
+
+function getIo(): SymfonyStyle
+{
+    global $IN;
+    global $OUT;
+    return new SymfonyStyle($IN ?: new ArgvInput(), $OUT ?: new NullOutput);
 }

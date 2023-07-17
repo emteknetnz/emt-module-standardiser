@@ -2,6 +2,7 @@
 
 (function() {
     global $MODULE_DIR;
+    info("Updating composer.json in $MODULE_DIR");
     $filename = "$MODULE_DIR/composer.json";
     if (!file_exists($filename)) {
         info("No composer.json found in $MODULE_DIR though that's probably OK");
