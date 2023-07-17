@@ -41,9 +41,10 @@ function writeTemplateFileIfNotExists($filename, $content)
 
 function getSupportedModules($cmsMajor)
 {
-    $filename = "_data/$cmsMajor/modules.json";
+    $filename = "_data/modules-cms$cmsMajor.json";
     if (!file_exists($filename)) {
         $url = "https://raw.githubusercontent.com/silverstripe/supported-modules/$cmsMajor/modules.json";
+        info("Downloading $url to $filename");
         $contents = file_get_contents($url);
         file_put_contents($filename, $contents);
     }
@@ -82,13 +83,21 @@ function warning($message)
 
 function error($message)
 {
-    // Don't throw hard exception here, instead let the rest of this script run
+    // don't throw hard exception here, instead let the rest of this script run
     getIo()->error($message);
 }
 
 function getIo(): SymfonyStyle
 {
-    global $IN;
-    global $OUT;
+    global $IN, $OUT;
     return new SymfonyStyle($IN ?: new ArgvInput(), $OUT ?: new NullOutput);
+}
+
+function removeDir($dirname)
+{
+    if (!file_exists(($dirname))) {
+        return;
+    }
+    info("Removing $dirname");
+    shell_exec("rm -rf $dirname");
 }

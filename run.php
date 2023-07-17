@@ -21,43 +21,66 @@ $app->register('update')
         next-patch
         last-major-next-patch
     EOT))
-    ->addOption('reclone', 'r', InputOption::VALUE_NONE, 'Delete and reclone modules in _modules dir')
+    ->addOption('reset', 'r', InputOption::VALUE_NONE, 'Delete _data and _modules dirs')
     ->addOption('dry-run', 'd', InputOption::VALUE_NONE, 'Dry-run - do not create pull-requests')
     ->addOption('module', 'm', InputOption::VALUE_REQUIRED, 'Only update the specified module e.g. silverstripe-config')
     ->setCode(function (InputInterface $input, OutputInterface $output): int {
-        global $MODULE_DIR;
-        global $OUT;
+        // variables
+        global $MODULE_DIR, $OUT;
         $OUT = $output;
+        $dataDir = '_data';
         $modulesDir = '_modules';
+
         // branch
         $branch = $input->getOption('branch');
         if (!in_array($branch, ['next-minor', 'next-patch', 'last-major-next-patch'])) {
             $branch = 'next-minor';
         }
-        // _module dir
-        if ($input->getOption('reclone')) {
-            unlink($modulesDir);
+
+        // dirs
+        if ($input->getOption('reset')) {
+            removeDir($dataDir);
+            removeDir($modulesDir);
+        }
+        if (!file_exists($dataDir)) {
+            mkdir($dataDir);
         }
         if (!file_exists($modulesDir)) {
             mkdir($modulesDir);
         }
-        // run
-        // @todo - get modules from  funcs.php::getSupportedModules($cmsMajor)
-        $modules = [
-            'silverstripe-config'
-        ];
+
+        // cmsMajor
+        // @todo detect cms major to use based on command line args
+        // works out default branch // default major // diff - see gha-merge-up
+        $cmsMajor = '5';
+
+        // modules
+        $modules = getSupportedModules($cmsMajor);
+        if ($input->getOption('module')) {
+            $modules = array_filter($modules, function ($module) use ($input) {
+                return $module === $input->getOption('module');
+            });
+        }
+        exit;
+
+        // script files
         $scriptFiles = array_merge(
             getScriptFiles('any'),
-            // @todo detect cms major to use based on command line args
-            // works out default branch // default major // diff - see gha-merge-up
-            getScriptFiles('5'),
+            getScriptFiles($cmsMajor),
         );
         foreach ($modules as $module) {
             $MODULE_DIR = "$modulesDir/$module";
+            if (!file_exists($MODULE_DIR)) {
+                $cmd = "git clone {$module['cloneUrl']} $MODULE_DIR";
+                $output->writeln($cmd);
+                shell_exec($cmd);
+            }
             foreach ($scriptFiles as $scriptFile) {
                 include $scriptFile;
             }
         }
+
+        // return status
         return Command::SUCCESS;
     });
 $app->run();
