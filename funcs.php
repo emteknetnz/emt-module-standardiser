@@ -19,7 +19,7 @@ function getScriptFiles($cmsMajor)
     return $scriptFiles;
 }
 
-function writeTemplateFile($filename, $content)
+function writeTemplateFileEvenIfExists($filename, $content)
 {
     global $MODULE_DIR;
     $content = prepareContent($content);
