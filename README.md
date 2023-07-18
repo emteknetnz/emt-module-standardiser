@@ -40,7 +40,6 @@ php run.php update <options>
 | --exclude | Exclude the specified modules (without account prefix) separated by commas e.g. silverstripe-mfa,silverstripe-totp |
 | --no-delete | Do not delete _data and _modules directories before running |
 
-
 ## GitHub API secondary rate limit
 
 You may hit a secondary GitHub rate limit because this tool will create too many pull-requests. To help with this 
@@ -49,13 +48,15 @@ add them to the --exclude flag on subsequent re-runs.
 
 ## Adding new scripts
 
-Simply add new scripts to either `scripts/cms-any` or `scripts/cms-<version>` and they will be run when the tool is run.
+Simply add new scripts to either `scripts/cms-any` or `scripts/cms-<version>` and they will be automatically picked 
+up and run when the tool is run.
 
-Ensure that new scripts have the following:
-- wrapped in an anonymous function that calls itself to ensure that variables are not shared between scripts
-- add `global $MODULE_DIR;` at the top of the script if you need to read any existing files in the module. `$MODULE_DIR` 
-  is a global variable that is set to the path of the module currently being processed
-- use functions available at the top of `funcs.php` such as `writeTemplateFileIfNotExists()` so that console output is consistent
+Follow these guidelines when writing scripts:
+- Wrap scripts in an anonymous function that calls itself to ensure that variables are not shared between scripts
+- Add `global $MODULE_DIR;` at the top of the script if you need to read any existing files in the module. 
+  `$MODULE_DIR` is a global variable that is set to the path of the module currently being processed
+- Use functions in `funcs_scripts.php` such as `writeTemplateFileIfNotExists()` so that console output is consistent
+- Do not use functions in `funcs_utils.php` as they are not intended to be used in scripts
 
 ## Updating the tool when a new major version of CMS is updated
 

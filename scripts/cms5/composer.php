@@ -9,7 +9,8 @@
     }
     $json = json_decode(file_get_contents($filename), true);
     if (!$json) {
-        error("Failed to parse json in $filename");
+        warning("Failed to parse json in $filename");
+        return;
     }
     $version = $json['require-dev']['phpunit/phpunit'] ?? null;
     if (is_null($version)) {

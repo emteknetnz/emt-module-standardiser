@@ -5,40 +5,10 @@ use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Process\Process;
 
-function writeTemplateFileEvenIfExists($filename, $content)
-{
-    global $MODULE_DIR;
-    writeFile("$MODULE_DIR/$filename", $content);
-}
-
-function writeTemplateFileIfNotExists($filename, $content)
-{
-    global $MODULE_DIR;
-    if (!file_exists("$MODULE_DIR/$filename")) {
-        writeFile("$MODULE_DIR/$filename", $content);
-    }
-}
-
-function writeFile($filename, $contents)
-{
-    $contents = trim($contents) . "\n";
-    file_put_contents($filename, $contents);
-    info("Wrote to $filename");
-}
-
-function info($message)
-{
-    // using writeln with <info> instead of ->info() so that it only takes up one line instead of five
-    getIo()->writeln("<info>$message</>");
-}
-
 // ==== DO NOT USE METHODS BELOW FOR USE IN SCRIPT FILES ====
 
-function warning($message)
-{
-    getIo()->warning($message);
-}
-
+// do not sure error() in scripts specificially because it will halt progress
+// using warning() + return instead which will output a big warning in the console while still continuing
 function error($message)
 {
     outputPrsCreated();
@@ -185,18 +155,6 @@ function outputReposWithPrsCreated()
     $io->writeln('Repos with pull requests created (add to --exclude if you need to re-run):');
     $io->writeln(implode(',', $REPOS_WITH_PRS_CREATED));
     $io->writeln('');
-}
-
-function isRecipe()
-{
-    global $MODULE_DIR;
-    if (strpos('/recipe-', $MODULE_DIR) !== false) {
-        return true;
-    }
-    if (strpos('/silverstripe-installer', $MODULE_DIR) !== false) {
-        return true;
-    }
-    return false;
 }
 
 function checkoutBranch($branches, $branchOption, $defaultBranch)

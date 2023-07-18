@@ -1,7 +1,8 @@
 <?php
 
 include 'vendor/autoload.php';
-include 'funcs.php';
+include 'funcs_scripts.php';
+include 'funcs_utils.php';
 
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Input\InputInterface;
