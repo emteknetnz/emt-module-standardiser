@@ -14,7 +14,8 @@ const CURRENT_CMS_MAJOR = '5';
 
 // global variables
 $MODULE_DIR = '';
-$PULL_REQUESTS_CREATED = [];
+$PRS_CREATED = [];
+$REPOS_WITH_PRS_CREATED = [];
 $OUT = null;
 
 $app = new Application();
@@ -30,11 +31,11 @@ $app->register('update')
     ->addOption('account', null, InputOption::VALUE_REQUIRED, 'GitHub account to use for creating pull-requests (default: creative-commoners)')
     ->addOption('only', null, InputOption::VALUE_REQUIRED, 'Only include the specified modules (without account prefix) separated by commas e.g. silverstripe-config,silverstripe-assets')
     ->addOption('exclude', null, InputOption::VALUE_REQUIRED, 'Exclude the specified modules (without account prefix) separated by commas e.g. silverstripe-mfa,silverstripe-totp')
-    ->addOption('no-delete', null, InputOption::VALUE_NONE, 'Do not delete _data and _modules dirs before running')
+    ->addOption('no-delete', null, InputOption::VALUE_NONE, 'Do not delete _data and _modules directories before running')
     ->setCode(function (InputInterface $input, OutputInterface $output): int {
 
         // variables
-        global $MODULE_DIR, $OUT, $PULL_REQUESTS_CREATED;
+        global $MODULE_DIR, $OUT, $PRS_CREATED, $REPOS_WITH_PRS_CREATED;
         $OUT = $output;
         $dataDir = '_data';
         $modulesDir = '_modules';
@@ -45,7 +46,7 @@ $app->register('update')
         // make sure everything setup correctly
         validateSystem();
 
-        // setup dirs
+        // setup directories
         if (!$input->getOption('no-delete')) {
             removeDir($dataDir);
             removeDir($modulesDir);
@@ -168,12 +169,14 @@ $app->register('update')
                         'head' => "$prAccount:$prBranch",
                         'base' => $checkoutBranch,
                     ]);
-                    $PULL_REQUESTS_CREATED[] = $responseJson['html_url'];
+                    $PRS_CREATED[] = $responseJson['html_url'];
+                    $REPOS_WITH_PRS_CREATED[] = $repo;
                     info("Created pull-request for $repo");
                 }
             }
         }
-        outputPullRequestsCreated();
+        outputReposWithPrsCreated();
+        outputPrsCreated();
         return Command::SUCCESS;
     });
 $app->run();

@@ -3,27 +3,7 @@
 use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Process\Exception\ProcessFailedException;
 use Symfony\Component\Process\Process;
-
-function getScriptFiles($cmsMajor)
-{
-    if (!ctype_digit($cmsMajor)) {
-        $cmsMajor = "-$cmsMajor";
-    }
-    $scriptFiles = [];
-    $dir = "scripts/cms$cmsMajor";
-    if ($handle = opendir($dir)) {
-        while (false !== ($scriptFile = readdir($handle))) {
-            if ('.' === $scriptFile || '..' === $scriptFile) {
-                continue;
-            }
-            $scriptFiles[] = "$dir/$scriptFile";
-        }
-        closedir($handle);
-    }
-    return $scriptFiles;
-}
 
 function writeTemplateFileEvenIfExists($filename, $content)
 {
@@ -37,6 +17,34 @@ function writeTemplateFileIfNotExists($filename, $content)
     if (!file_exists("$MODULE_DIR/$filename")) {
         writeFile("$MODULE_DIR/$filename", $content);
     }
+}
+
+function writeFile($filename, $contents)
+{
+    $contents = trim($contents) . "\n";
+    file_put_contents($filename, $contents);
+    info("Wrote to $filename");
+}
+
+function info($message)
+{
+    // using writeln with <info> instead of ->info() so that it only takes up one line instead of five
+    getIo()->writeln("<info>$message</>");
+}
+
+// ==== DO NOT USE METHODS BELOW FOR USE IN SCRIPT FILES ====
+
+function warning($message)
+{
+    getIo()->warning($message);
+}
+
+function error($message)
+{
+    outputPrsCreated();
+    outputReposWithPrsCreated();
+    getIo()->error($message);
+    die;
 }
 
 function getSupportedModules($cmsMajor)
@@ -63,29 +71,23 @@ function getSupportedModules($cmsMajor)
     return $modules;
 }
 
-function writeFile($filename, $contents)
+function getScriptFiles($cmsMajor)
 {
-    $contents = trim($contents) . "\n";
-    file_put_contents($filename, $contents);
-    info("Wrote to $filename");
-}
-
-function info($message)
-{
-    // using writeln with <info> instead of ->info() so that it only takes up one line instead of five
-    getIo()->writeln("<info>$message</>");
-}
-
-function warning($message)
-{
-    getIo()->warning($message);
-}
-
-function error($message)
-{
-    getIo()->error($message);
-    outputPullRequestsCreated();
-    die;
+    if (!ctype_digit($cmsMajor)) {
+        $cmsMajor = "-$cmsMajor";
+    }
+    $scriptFiles = [];
+    $dir = "scripts/cms$cmsMajor";
+    if ($handle = opendir($dir)) {
+        while (false !== ($scriptFile = readdir($handle))) {
+            if ('.' === $scriptFile || '..' === $scriptFile) {
+                continue;
+            }
+            $scriptFiles[] = "$dir/$scriptFile";
+        }
+        closedir($handle);
+    }
+    return $scriptFiles;
 }
 
 function cmd($cmd, $cwd)
@@ -163,15 +165,25 @@ function gitHubApi($url, $data = [])
     return json_decode($response, true);
 }
 
-function outputPullRequestsCreated()
+function outputPrsCreated()
 {
-    global $PULL_REQUESTS_CREATED;
+    global $PRS_CREATED;
     $io = getIo();
     $io->writeln('');
     $io->writeln('Pull requests created:');
-    foreach ($PULL_REQUESTS_CREATED as $pr) {
+    foreach ($PRS_CREATED as $pr) {
         $io->writeln($pr);
     }
+    $io->writeln('');
+}
+
+function outputReposWithPrsCreated()
+{
+    global $REPOS_WITH_PRS_CREATED;
+    $io = getIo();
+    $io->writeln('');
+    $io->writeln('Repos with pull requests created (add to --exclude if you need to re-run):');
+    $io->writeln(implode(',', $REPOS_WITH_PRS_CREATED));
     $io->writeln('');
 }
 
