@@ -1,3 +1,4 @@
 <?php
 // working directory will be root
-include 'funcs.php';
+include 'funcs_scripts.php';
+include 'funcs_utils.php';
