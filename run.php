@@ -17,15 +17,16 @@ $OUT = null;
 
 $app = new Application();
 $app->register('update')
-    ->addOption('branch', 'b', InputOption::VALUE_NONE, trim(<<<EOT
+    ->addOption('branch', null, InputOption::VALUE_NONE, trim(<<<EOT
         next-minor (default)
         next-patch
         last-major-next-patch
     EOT))
-    ->addOption('reset', 'r', InputOption::VALUE_NONE, 'Delete _data and _modules dirs')
-    ->addOption('dry-run', 'd', InputOption::VALUE_NONE, 'Dry-run - do not create pull-requests')
-    ->addOption('account', '-a', InputOption::VALUE_REQUIRED, 'Account to use for pull-requests (default: creative-commoners)')
-    ->addOption('modules', 'm', InputOption::VALUE_REQUIRED, 'Only update the specified modules (without account prefix) separated by commas e.g. silverstripe-config,silverstripe-assets')
+    ->addOption('reset', null, InputOption::VALUE_NONE, 'Delete _data and _modules dirs')
+    ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Do not push to github or create pull-requests')
+    ->addOption('account', null, InputOption::VALUE_REQUIRED, 'Account to use for pull-requests (default: creative-commoners)')
+    ->addOption('only', null, InputOption::VALUE_REQUIRED, 'Only include the specified modules (without account prefix) separated by commas e.g. silverstripe-config,silverstripe-assets')
+    ->addOption('exclude', null, InputOption::VALUE_REQUIRED, 'Exclude the specified modules (without account prefix) separated by commas e.g. silverstripe-mfa,silverstripe-totp')
     ->setCode(function (InputInterface $input, OutputInterface $output): int {
 
         // variables
@@ -65,10 +66,16 @@ $app->register('update')
 
         // modules
         $modules = getSupportedModules($cmsMajor);
-        if ($input->getOption('modules')) {
-            $moduleArray = explode(',', $input->getOption('modules'));
-            $modules = array_filter($modules, function ($module) use ($input, $moduleArray) {
-                return in_array($module['repo'], $moduleArray);
+        if ($input->getOption('only')) {
+            $only = explode(',', $input->getOption('only'));
+            $modules = array_filter($modules, function ($module) use ($only) {
+                return in_array($module['repo'], $only);
+            });
+        }
+        if ($input->getOption('exclude')) {
+            $exclude = explode(',', $input->getOption('exclude'));
+            $modules = array_filter($modules, function ($module) use ($exclude) {
+                return !in_array($module['repo'], $exclude);
             });
         }
 
@@ -122,7 +129,8 @@ $app->register('update')
             $origin = cmd('git remote get-url origin', $MODULE_DIR);
             $prOrigin = str_replace("git@github.com:$account", "git@github.com:$prAccount", $origin);
             // remove any existing pr-remote - need to do this in case we change the account option
-            if (cmd('git remote | grep pr-remote', $MODULE_DIR)) {
+            $remotes = explode("\n", cmd('git remote', $MODULE_DIR));
+            if (in_array('pr-remote', $remotes)) {
                 cmd('git remote remove pr-remote', $MODULE_DIR);
             }
             cmd("git remote add pr-remote $prOrigin", $MODULE_DIR);

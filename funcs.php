@@ -96,7 +96,8 @@ function cmd($cmd, $cwd)
     $process = Process::fromShellCommandline($cmd, $cwd);
     $process->run();
     if (!$process->isSuccessful()) {
-        error($process->getErrorOutput());
+        warning("Error running command: $cmd in $cwd");
+        error("Output was: " . $process->getErrorOutput());
     }
     return trim($process->getOutput());
 }
@@ -158,4 +159,16 @@ function outputPullRequestsCreated()
         $io->writeln($pr);
     }
     $io->writeln('');
+}
+
+function isRecipe()
+{
+    global $MODULE_DIR;
+    if (strpos('/recipe-', $MODULE_DIR) !== false) {
+        return true;
+    }
+    if (strpos('/silverstripe-installer', $MODULE_DIR) !== false) {
+        return true;
+    }
+    return false;
 }

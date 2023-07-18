@@ -12,3 +12,11 @@ cd module-standardiser
 composer install
 php run.php update
 ```
+
+## Command line options:
+
+# TODO make this a table
+
+* `--reset` - Delete _data and _modules dirs
+* `--dry-run` - Do not push to github or create pull-requests
+* `--only` - Only include the specified modules (without account prefix) separated by commas e.g. silverstripe-config,silverstripe-assets
