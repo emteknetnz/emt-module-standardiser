@@ -9,6 +9,9 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputOption;
 
+// consts
+const CURRENT_CMS_MAJOR = '5';
+
 // global variables
 $MODULE_DIR = '';
 $PULL_REQUESTS_CREATED = [];
@@ -16,10 +19,12 @@ $OUT = null;
 
 $app = new Application();
 $app->register('update')
-    ->addOption('branch', null, InputOption::VALUE_NONE, trim(<<<EOT
-        next-minor (default)
-        next-patch
-        last-major-next-patch
+    ->addOption('branch', null, InputOption::VALUE_REQUIRED, trim(<<<EOT
+        next-major-next-minor - use the default branch plus 1
+        next-minor - will use the default branch of the repo (default)
+        next-patch - will use the highest minor branch that matches the default branch 
+        last-major-next-minor - will use the default branch minus 1
+        last-major-next-patch - will use the highest minor branches the default branch minus 1
     EOT))
     ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Do not push to github or create pull-requests')
     ->addOption('account', null, InputOption::VALUE_REQUIRED, 'GitHub account to use for creating pull-requests (default: creative-commoners)')
@@ -40,13 +45,7 @@ $app->register('update')
         // make sure everything setup correctly
         validateSystem();
 
-        // branch
-        $branch = $input->getOption('branch');
-        if (!in_array($branch, ['next-minor', 'next-patch', 'last-major-next-patch'])) {
-            $branch = 'next-minor';
-        }
-
-        // dirs
+        // setup dirs
         if (!$input->getOption('no-delete')) {
             removeDir($dataDir);
             removeDir($modulesDir);
@@ -58,10 +57,26 @@ $app->register('update')
             mkdir($modulesDir);
         }
 
-        // cmsMajor
-        // @todo detect cms major to use based on command line args
-        // works out default branch // default major // diff - see gha-merge-up
-        $cmsMajor = '5';
+        // branch
+        $branchOption = $input->getOption('branch');
+        if (!in_array($branchOption, [
+            'next-major-next-minor',
+            'next-minor',
+            'next-patch',
+            'last-major-next-minor',
+            'last-major-next-patch'
+        ])) {
+            $branchOption = 'next-minor';
+        }
+
+        // work out the CMS major version to use
+        // there is an assumption that the default branch for repos being updated matches the current CMS major version
+        $cmsMajor = CURRENT_CMS_MAJOR;
+        if (strpos($branchOption, 'last-major') !== false) {
+            $cmsMajor = CURRENT_CMS_MAJOR - 1;
+        } elseif (strpos($branchOption, 'next-major') !== false) {
+            $cmsMajor = CURRENT_CMS_MAJOR + 1;
+        }
 
         // modules
         $modules = getSupportedModules($cmsMajor);
@@ -93,28 +108,27 @@ $app->register('update')
             if (!file_exists($MODULE_DIR)) {
                 cmd("git clone $cloneUrl", $modulesDir);
             }
+
+            // get default branch
+            $cmd = "git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'";
+            $defaultBranch = cmd($cmd, $MODULE_DIR);
+            
+            // get all branches
+            // https://docs.github.com/en/rest/branches/branches?apiVersion=2022-11-28#list-branches
+            $allBranches = explode("\n", cmd('git branch -r', $MODULE_DIR));
+            $allBranches = array_map(fn($branch) => trim(str_replace('origin/', '', $branch)), $allBranches);
+
             // work out module branch to checkout
-            if ($branch === 'next-patch') {
-                // @todo
-                error('branch=next-patch is not supported yet');
-                $checkoutBranch = 'todo';
-            } elseif ($branch === 'last-major-next-patch') {
-                // @todo
-                error('branch=last-major-next-patch is not supported yet');
-                $checkoutBranch = 'todo';
-            } else {
-                // next-minor (default)
-                // assuming that default branch is the next-minor for now
-                // @todo: don't do this
-                $cmd = "git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'";
-                $checkoutBranch = cmd($cmd, $MODULE_DIR);
+            $checkoutBranch = checkoutBranch($allBranches, $branchOption, $defaultBranch);
+            if (!in_array($checkoutBranch, $allBranches)) {
+                error("Could not find branch to checkout for $repo using --branch=$branchOption");
             }
 
-            // checkout the base branch - this is important if not using the --reset option
+            // checkout the base branch - this is important if re-running while using the --no-delete option
             cmd("git checkout $checkoutBranch", $MODULE_DIR);
-            $timestamp = time();
 
             // create a new branch used for the pull-request
+            $timestamp = time();
             $prBranch = "pulls/$checkoutBranch/module-standardiser-$timestamp";
             cmd("git checkout -b $prBranch", $MODULE_DIR);
 
@@ -148,31 +162,14 @@ $app->register('update')
                     cmd("git push -u pr-remote $prBranch", $MODULE_DIR);
                     // create pull-request using github api
                     // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#create-a-pull-request
-                    $url = "https://api.github.com/repos/$account/$repo/pulls";
-                    $data = json_encode([
+                    $responseJson = gitHubApi("https://api.github.com/repos/$account/$repo/pulls", [
                         'title' => $prTitle,
                         'body' => $prDescripton,
                         'head' => "$prAccount:$prBranch",
                         'base' => $checkoutBranch,
-                    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-                    $token = githubToken();
-                    $headers = [
-                        'User-Agent: silverstripe-module-standardiser',
-                        'Accept: application/vnd.github+json',
-                        "Authorization: Bearer $token",
-                        'X-GitHub-Api-Version: 2022-11-28'
-                    ];
-                    list($response, $httpcode) = curlPost($url, $data, $headers);
-                    if ($httpcode === 201) {
-                        $json = json_decode($response, true);
-                        $prUrl = $json['html_url'];
-                        $PULL_REQUESTS_CREATED[] = $prUrl;
-                        info("Created pull-request for $repo");
-                    } else {
-                        warning("HTTP code $httpcode returned from github api");
-                        warning($response);
-                        error("Failed to create pull-request for $repo");
-                    }
+                    ]);
+                    $PULL_REQUESTS_CREATED[] = $responseJson['html_url'];
+                    info("Created pull-request for $repo");
                 }
             }
         }

@@ -136,17 +136,31 @@ function githubToken()
     return $json['github-oauth']['github.com'] ?? '';
 }
 
-function curlPost($url, $data, $headers = [])
+function gitHubApi($url, $data = [])
 {
+    $token = githubToken();
+    $jsonStr = empty($data) ? '' : json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+    curl_setopt($ch, CURLOPT_POST, !empty($data));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'User-Agent: silverstripe-module-standardiser',
+        'Accept: application/vnd.github+json',
+        "Authorization: Bearer $token",
+        'X-GitHub-Api-Version: 2022-11-28'
+    ]);
+    if ($jsonStr) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonStr);
+    }
     $response = curl_exec($ch);
     $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
-    return [$response, $httpcode];
+    if ($httpcode >= 300) {
+        warning("HTTP code $httpcode returned from GitHub API");
+        warning($response);
+        error("Failure calling github api: $url");
+    }
+    return json_decode($response, true);
 }
 
 function outputPullRequestsCreated()
@@ -171,4 +185,32 @@ function isRecipe()
         return true;
     }
     return false;
+}
+
+function checkoutBranch($branches, $branchOption, $defaultBranch)
+{
+    // always assume the default branch is the next-minor branch
+    $branches = array_filter($branches, fn($branch) => preg_match('#^[0-9\.]+$#', $branch));
+    usort($branches, 'version_compare');
+    $branches = array_reverse($branches);
+    $nextMinorBranch = $defaultBranch;
+    $lastMajor = $defaultBranch - 1;
+    if ($branchOption === 'next-patch') {
+        $checkoutBranch = array_values(array_filter(
+            $branches,
+            fn($branch) => preg_match("#^$defaultBranch.[0-9]+$#", $branch)
+        ))[0] ?? null;
+    } elseif ($branchOption === 'last-major-next-minor') {
+        $checkoutBranch = $defaultBranch - 1;
+    } elseif ($branchOption === 'next-major-next-minor') {
+        $checkoutBranch = $defaultBranch + 1;
+    } elseif ($branchOption === 'last-major-next-patch') {
+        $checkoutBranch = array_values(array_filter(
+            $branches,
+            fn($branch) => preg_match("#^$lastMajor\.[0-9]+$#", $branch)
+        ))[0] ?? null;
+    } else {
+        $checkoutBranch = $nextMinorBranch;
+    }
+    return (string) $checkoutBranch;
 }
