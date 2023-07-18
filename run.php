@@ -9,7 +9,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputOption;
 
-
 // global variables
 $MODULE_DIR = '';
 $PULL_REQUESTS_CREATED = [];
@@ -22,11 +21,11 @@ $app->register('update')
         next-patch
         last-major-next-patch
     EOT))
-    ->addOption('reset', null, InputOption::VALUE_NONE, 'Delete _data and _modules dirs')
     ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Do not push to github or create pull-requests')
-    ->addOption('account', null, InputOption::VALUE_REQUIRED, 'Account to use for pull-requests (default: creative-commoners)')
+    ->addOption('account', null, InputOption::VALUE_REQUIRED, 'GitHub account to use for creating pull-requests (default: creative-commoners)')
     ->addOption('only', null, InputOption::VALUE_REQUIRED, 'Only include the specified modules (without account prefix) separated by commas e.g. silverstripe-config,silverstripe-assets')
     ->addOption('exclude', null, InputOption::VALUE_REQUIRED, 'Exclude the specified modules (without account prefix) separated by commas e.g. silverstripe-mfa,silverstripe-totp')
+    ->addOption('no-delete', null, InputOption::VALUE_NONE, 'Do not delete _data and _modules dirs before running')
     ->setCode(function (InputInterface $input, OutputInterface $output): int {
 
         // variables
@@ -48,7 +47,7 @@ $app->register('update')
         }
 
         // dirs
-        if ($input->getOption('reset')) {
+        if (!$input->getOption('no-delete')) {
             removeDir($dataDir);
             removeDir($modulesDir);
         }
