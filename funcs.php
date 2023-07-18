@@ -3,6 +3,8 @@
 use Symfony\Component\Console\Output\NullOutput;
 use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Process;
 
 function getScriptFiles($cmsMajor)
 {
@@ -26,14 +28,12 @@ function getScriptFiles($cmsMajor)
 function writeTemplateFileEvenIfExists($filename, $content)
 {
     global $MODULE_DIR;
-    $content = prepareContent($content);
     writeFile("$MODULE_DIR/$filename", $content);
 }
 
 function writeTemplateFileIfNotExists($filename, $content)
 {
     global $MODULE_DIR;
-    $content = prepareContent($content);
     if (!file_exists("$MODULE_DIR/$filename")) {
         writeFile("$MODULE_DIR/$filename", $content);
     }
@@ -51,21 +51,21 @@ function getSupportedModules($cmsMajor)
     $json = json_decode(file_get_contents($filename), true);
     $modules = [];
     foreach ($json as $module) {
+        $ghrepo = $module['github'];
         $modules[] = [
-            'cloneUrl' => 'git@github.com:' . $module['github'] . '.git',
+            'ghrepo' => $ghrepo,
+            'account' => explode('/', $ghrepo)[0],
+            'repo' => explode('/', $ghrepo)[1],
+            'cloneUrl' => "git@github.com:$ghrepo.git",
             'branch' => max($module['branches'])
         ];
     }
     return $modules;
 }
 
-function prepareContent($content)
-{
-    return trim($content) . "\n";
-}
-
 function writeFile($filename, $contents)
 {
+    $contents = trim($contents) . "\n";
     file_put_contents($filename, $contents);
     info("Wrote to $filename");
 }
@@ -83,8 +83,22 @@ function warning($message)
 
 function error($message)
 {
-    // don't throw hard exception here, instead let the rest of this script run
     getIo()->error($message);
+    outputPullRequestsCreated();
+    die;
+}
+
+function cmd($cmd, $cwd)
+{
+    $message = "Running command: $cmd in $cwd";
+    info($message);
+    // using Process::fromShellCommandline() instead of new Process() so that pipes work
+    $process = Process::fromShellCommandline($cmd, $cwd);
+    $process->run();
+    if (!$process->isSuccessful()) {
+        error($process->getErrorOutput());
+    }
+    return trim($process->getOutput());
 }
 
 function getIo(): SymfonyStyle
@@ -100,4 +114,48 @@ function removeDir($dirname)
     }
     info("Removing $dirname");
     shell_exec("rm -rf $dirname");
+}
+
+function validateSystem()
+{
+    if (!githubToken()) {
+        error('Could not get github token');
+    }
+}
+
+function githubToken()
+{
+    // using composer token that's assumed to be on users laptop
+    // could also support passing in a token via env variable, though this should be good enough
+    $auth = cmd('cat ~/.config/composer/auth.json', '.');
+    if (!$auth) {
+        return '';
+    }
+    $json = json_decode($auth, true);
+    return $json['github-oauth']['github.com'] ?? '';
+}
+
+function curlPost($url, $data, $headers = [])
+{
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+    $response = curl_exec($ch);
+    $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return [$response, $httpcode];
+}
+
+function outputPullRequestsCreated()
+{
+    global $PULL_REQUESTS_CREATED;
+    $io = getIo();
+    $io->writeln('');
+    $io->writeln('Pull requests created:');
+    foreach ($PULL_REQUESTS_CREATED as $pr) {
+        $io->writeln($pr);
+    }
+    $io->writeln('');
 }
